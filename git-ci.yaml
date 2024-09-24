@@ -1,0 +1,80 @@
+stages:
+  - terraform
+  - authenticate
+  - init
+  - build
+  - deploy
+
+
+terraform_apply:
+  stage: terraform
+  image: hashicorp/terraform:latest  # Use a Terraform image
+  script:
+    - terraform init
+    - terraform plan -out=tfplan
+    - terraform apply -auto-approve tfplan
+
+  artifacts:
+    paths:
+      - terraform.tfstate  # Save Terraform state as an artifact
+
+
+authenticate:
+  stage: authenticate
+  image: google/cloud-sdk:latest
+  dependencies:
+    - terraform_apply
+  script:
+    - gcloud auth login --brief --cred-file=${GOOGLE_APPLICATION_CREDENTIALS}
+    - gcloud config set project $DEVSHELL_PROJECT_ID
+
+
+download_and_unzip:
+  stage: init
+  image: google/cloud-sdk:latest 
+  dependencies:
+    - authenticate
+  script:
+    - apt-get update && apt-get install -y wget
+    - apt-get update && apt-get install -y unzip
+    - gcloud auth login --cred-file ${GCP_WIF_KEY}
+    - wget https://storage.googleapis.com/bootcamp-gcp-en/bootcamp-gcp-module-lb-files-app-usa.zip
+    - unzip bootcamp-gcp-module-lb-files-app-usa.zip
+    - wget https://storage.googleapis.com/bootcamp-gcp-en/bootcamp-gcp-module-lb-files-app-finland.zip
+    - unzip bootcamp-gcp-module-lb-files-app-finland.zip
+  only:
+    - develop
+  artifacts:
+    paths:
+      - bootcamp-gcp-module-lb-files-app-usa/
+      - bootcamp-gcp-module-lb-files-app-finland/
+
+  
+gcloud_build_submit:
+  stage: build
+  image: google/cloud-sdk:latest
+  dependencies:
+    - download_and_unzip
+  script:
+    - cd bootcamp-gcp-module-lb-files-app-usa || exit 1  # Check if the directory exists
+    - gcloud auth activate-service-account --key-file=${SA_REVIEW_KEY}
+    - gcloud builds submit --tag gcr.io/$DEVSHELL_PROJECT_ID/appkidsflixusa --project $DEVSHELL_PROJECT_ID
+    - cd ..
+    - cd bootcamp-gcp-module-lb-files-app-finland || exit 1
+    - gcloud auth activate-service-account --key-file=${SA_REVIEW_KEY}
+    - gcloud builds submit --tag gcr.io/$DEVSHELL_PROJECT_ID/appkidsflixfinland:latest --project $DEVSHELL_PROJECT_ID
+  only:
+    - develop
+
+deploy_cloud_run:
+  stage: deploy
+  image: google/cloud-sdk:latest
+  dependencies:
+    - gcloud_build_submit
+  script:
+    - gcloud auth activate-service-account --key-file=${SA_REVIEW_KEY}
+    - gcloud config set project $DEVSHELL_PROJECT_ID
+    - gcloud run deploy appkidsflixusa --image gcr.io/$DEVSHELL_PROJECT_ID/appkidsflixusa:latest --port 5000 --platform managed --region us-central1 --allow-unauthenticated
+    - gcloud run deploy appkidsflixfinland --image gcr.io/$DEVSHELL_PROJECT_ID/appkidsflixfinland:latest --port 5000 --platform managed --region europe-north1 --allow-unauthenticated
+  only:
+    - develop
