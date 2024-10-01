@@ -1,33 +1,32 @@
-
 stages:
-  - terraform
+  # - terraform
   - authenticate
   - loadBalancer
 
-terraform_apply:
-  stage: terraform
-  image: hashicorp/terraform:latest  # Use a Terraform image
-  script:
-    - terraform --version  # Check Terraform version
-    # Initialize Terraform
-    - terraform init
-    # Plan the changes (Optional)
-    - terraform plan -out=tfplan
-    # Apply the changes (Automate infrastructure setup)
-    - terraform apply -auto-approve tfplan
+# terraform_apply:
+#   stage: terraform
+#   image: hashicorp/terraform:latest  # Use a Terraform image
+#   script:
+#     - terraform --version  # Check Terraform version
+#     # Initialize Terraform
+#     - terraform init
+#     # Plan the changes (Optional)
+#     - terraform plan -out=tfplan
+#     # Apply the changes (Automate infrastructure setup)
+#     - terraform apply -auto-approve tfplan
 
-  artifacts:
-    paths:
-      - terraform.tfstate  # Save Terraform state as an artifact
+#   artifacts:
+#     paths:
+#       - terraform.tfstate  # Save Terraform state as an artifact
 
 authenticate:
   stage: authenticate
   image: google/cloud-sdk:latest
-  dependencies: 
-  - terraform_apply
+  # dependencies: 
+  # - terraform_apply
   script:
     # Set up WIF-based authentication
-    - gcloud auth login --brief --cred-file=${GOOGLE_APPLICATION_CREDENTIALS}
+    - gcloud auth activate-service-account --key-file=${SA_REVIEW_KEY}
     - gcloud config set project $DEVSHELL_PROJECT_ID
 
 
@@ -46,7 +45,9 @@ compute engine :
     - gcloud compute backend-services add-backend kidsflix-backend-global --global --network-endpoint-group=sneg-appkidsflixusa --network-endpoint-group-region=us-central1
     - gcloud compute url-maps create lb-kidsflix-global --default-service kidsflix-backend-global
     - gcloud compute target-http-proxies create lb-kidsflix-httpproxy --url-map=lb-kidsflix-global
-    - gcloud compute addresses delete kidsflix-global-ip --global
+    # - gcloud compute addresses delete kidsflix-global-ip --global
     - gcloud compute addresses create kidsflix-global-ip --ip-version=IPV4 --global
     - gcloud compute addresses describe kidsflix-global-ip --format="get(address)" --global
     - gcloud compute forwarding-rules create kidsflix-frontend-global --address=kidsflix-global-ip --target-http-proxy=lb-kidsflix-httpproxy --global --ports=80
+ 
+
