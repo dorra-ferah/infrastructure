@@ -1,33 +1,39 @@
 stages:
-  - terraform
+  # - terraform
   - authenticate
   - init
   - build
   - deploy
 
 
-terraform_apply:
-  stage: terraform
-  image: hashicorp/terraform:latest  # Use a Terraform image
-  script:
-    - terraform init
-    - terraform plan -out=tfplan
-    - terraform apply -auto-approve tfplan
+# terraform_apply:
+#   stage: terraform
+#   image: hashicorp/terraform:latest  # Use a Terraform image
+#   script:
+#     - terraform init
+#     - terraform plan -out=tfplan
+#     - terraform apply -auto-approve tfplan
 
-  artifacts:
-    paths:
-      - terraform.tfstate  # Save Terraform state as an artifact
+#   artifacts:
+#     paths:
+#       - terraform.tfstate  # Save Terraform state as an artifact
 
 
 authenticate:
   stage: authenticate
   image: google/cloud-sdk:latest
-  dependencies:
-    - terraform_apply
+  # dependencies:
+  #   - terraform_apply
   script:
-    - gcloud auth login --brief --cred-file=${GOOGLE_APPLICATION_CREDENTIALS}
-    - gcloud config set project $DEVSHELL_PROJECT_ID
-
+    - echo ${GCP_WIF_REVIEW_KEY}
+    - echo ${CI_JOB_JWT_V2} > .ci_job_jwt_file
+    - gcloud auth login --cred-file ${GCP_WIF_REVIEW_KEY}
+  artifacts:
+    reports:
+      dotenv: authentication-review.env
+    paths:
+     - bootcamp-gcp-module-lb-files-app-usa/
+     - bootcamp-gcp-module-lb-files-app-finland/
 
 download_and_unzip:
   stage: init
@@ -37,7 +43,7 @@ download_and_unzip:
   script:
     - apt-get update && apt-get install -y wget
     - apt-get update && apt-get install -y unzip
-    - gcloud auth login --cred-file ${GCP_WIF_KEY}
+    - gcloud auth login --cred-file ${GCP_WIF_REVIEW_KEY}
     - wget https://storage.googleapis.com/bootcamp-gcp-en/bootcamp-gcp-module-lb-files-app-usa.zip
     - unzip bootcamp-gcp-module-lb-files-app-usa.zip
     - wget https://storage.googleapis.com/bootcamp-gcp-en/bootcamp-gcp-module-lb-files-app-finland.zip
