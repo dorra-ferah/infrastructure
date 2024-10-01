@@ -1,5 +1,6 @@
 provider "google" {
-  project = var.project_id
+  project     = var.DEVSHELL_PROJECT_ID
+  credentials = file("C:/Users/dferah/Downloads/sbx-31371-8wo59d45lox6o935c5nc-afafdee7a544.json") # Remplacez par le chemin de votre clé
 }
 
 resource "google_iam_workload_identity_pool" "pool" {
@@ -16,11 +17,18 @@ resource "google_iam_workload_identity_pool_provider" "oidc_provider" {
   oidc {
     issuer_uri = "https://gitlab.tech.orange"
   }
+
+  attribute_mappings = {
+    "google.subject" = "assertion.projet_id"  # Maps the 'sub' claim from the OIDC token to the Google 'subject'
+    "attribute.project_path" = "assertion.project_path"  # Map GitLab's repository claim
+  }
+
 }
 
+
 resource "google_service_account" "sa" {
-  account_id   = "986907473259-compute@developer.gserviceaccount.com  "
-  display_name = "986907473259-compute@developer.gserviceaccount.com "
+  account_id   = "sa986907473259"  # Utilisez un nom valide
+  display_name = "sa986907473259"
 }
 
 resource "google_service_account_iam_binding" "wif_sa_binding" {
